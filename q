@@ -89,4 +89,25 @@ if (responseCode == HttpURLConnection.HTTP_OK) {
 }
 
 
+__________________________________________________
+
+
+
+    public static String ensureCodeVerifierInSession(HttpSession session) throws NoSuchAlgorithmException {
+        // Check if the code_verifier already exists in the session
+        String codeVerifier = (String) session.getAttribute("codeVerifier");
+
+        if (codeVerifier == null || codeVerifier.isEmpty()) {
+            // If code_verifier is not found, generate a new one
+            codeVerifier = PkceUtil.generateCodeVerifier();
+
+            // Store the newly generated code_verifier in the session
+            session.setAttribute("codeVerifier", codeVerifier);
+        }
+
+        // Return the code_verifier (either retrieved or newly generated)
+        return codeVerifier;
+    }
+
+
 

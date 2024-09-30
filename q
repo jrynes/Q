@@ -1,10 +1,3 @@
-<?xml version="1.0" ?>
-<module xmlns="urn:jboss:module:1.1" name="com.oracle.jdbc">
-    <resources>
-        <resource-root path="ojdbc8.jar"/> <!-- Replace with your actual JDBC jar file -->
-    </resources>
-    <dependencies>
-        <module name="javax.api"/>
-        <module name="javax.transaction.api"/>
-    </dependencies>
-</module>
+        <driver name="oracle" module="com.oracle.jdbc">
+            <xa-datasource-class>oracle.jdbc.xa.client.OracleXADataSource</xa-datasource-class>
+        </driver>

@@ -16,3 +16,20 @@
     // Make the data available to the client script
     data.metricsData = metricsData;
 })();
+
+________________________________________________________________________________________________
+
+
+function($scope) {
+    // Access data provided by the server script
+    const data = $scope.data.metricsData;
+    
+    // Initialize the chart with the D3.js code here
+    updateChart(data);
+
+    function updateChart(data) {
+        // Your D3.js chart code to render data on the page
+    }
+}
+
+

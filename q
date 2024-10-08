@@ -20,16 +20,18 @@
 ________________________________________________________________________________________________
 
 
-function($scope) {
+api.controller = function() {
+    var c = this;
+
     // Access data provided by the server script
-    const data = $scope.data.metricsData;
-    
+    const data = c.data.metricsData;
+
     // Initialize the chart with the D3.js code here
     updateChart(data);
 
     function updateChart(data) {
         // Your D3.js chart code to render data on the page
     }
-}
+};
 
 

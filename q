@@ -1,3 +1,110 @@
+<html>
+<head>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        #chart-container {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chart-container"></div>
+    <script>
+        // Use GlideAjax to fetch data from the Script Include
+        var ga = new GlideAjax('ChatbotUsageData');
+        ga.addParam('sysparm_name', 'getUsageData'); // Calls the getUsageData function
+        ga.getXMLAnswer(function(response) {
+            var data = JSON.parse(response);
+
+            // Pass the data to D3.js for rendering
+            renderChart(data);
+        });
+
+        // Function to render the D3.js chart
+        function renderChart(data) {
+            var margin = { top: 20, right: 30, bottom: 50, left: 60 },
+                width = 600 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            var svg = d3.select("#chart-container")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            // Set up scales and axes
+            var x = d3.scaleBand()
+                      .domain(data.map(d => d.date))
+                      .range([0, width])
+                      .padding(0.1);
+            var y = d3.scaleLinear()
+                      .domain([0, d3.max(data, d => d.messages)])
+                      .nice()
+                      .range([height, 0]);
+
+            // Draw bars
+            svg.selectAll(".bar")
+               .data(data)
+               .enter().append("rect")
+               .attr("class", "bar")
+               .attr("x", d => x(d.date))
+               .attr("y", d => y(d.messages))
+               .attr("width", x.bandwidth())
+               .attr("height", d => height - y(d.messages));
+
+            // Add axes
+            svg.append("g")
+               .attr("class", "x-axis")
+               .attr("transform", "translate(0," + height + ")")
+               .call(d3.axisBottom(x));
+            svg.append("g")
+               .attr("class", "y-axis")
+               .call(d3.axisLeft(y));
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+________________________________________________________________________________________________
+
+var ChatbotUsageData = Class.create();
+ChatbotUsageData.prototype = Object.extend(new AbstractAjaxProcessor(), {
+    
+    // Define a function to get chatbot usage data
+    getUsageData: function() {
+        var gr = new GlideRecord('u_chatbot_metrics'); // Replace with your table name
+        gr.query();
+
+        // Initialize an array to store the data
+        var data = [];
+        while (gr.next()) {
+            data.push({
+                date: gr.getValue('u_date'), // Replace with your actual date field
+                messages: parseInt(gr.getValue('u_total_interactions'), 10) // Replace with your actual messages field
+            });
+        }
+
+        // Return the data as a JSON string
+        return JSON.stringify(data);
+    },
+
+    type: 'ChatbotUsageData'
+});
+
+
+
+
+
+
 // Server Script
 (function() {
     // Create a GlideRecord object to query the chatbot metrics table

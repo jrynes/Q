@@ -1,3 +1,19 @@
+function loadD3(callback) {
+    var script = document.createElement('script');
+    script.src = 'https://d3js.org/d3.v6.min.js';
+    script.onload = callback; // Once loaded, call the provided callback
+    document.head.appendChild(script);
+}
+
+// Call loadD3 and define your D3 code in the callback function
+loadD3(function() {
+    // Your D3.js code goes here
+    console.log("D3 version:", d3.version); // Check if D3 is loaded and accessible
+});
+
+
+________________________________________________________________________________________________
+
 <!-- HTML Container for the Chart -->
 <div id="chart-container" style="width:100%; height:400px;"></div>
 

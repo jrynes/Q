@@ -1,3 +1,78 @@
+<!-- HTML Container for the Chart -->
+<div id="chart-container" style="width:100%; height:400px;"></div>
+
+<!-- Load D3.js Library -->
+<script src="https://d3js.org/d3.v6.min.js"></script>
+
+<script>
+    // GlideAjax call to fetch data from ServiceNow
+    var ga = new GlideAjax('ChatbotUsageData'); // Make sure 'ChatbotUsageData' is the name of your Script Include
+    ga.addParam('sysparm_name', 'getUsageData'); // Calling the function 'getUsageData' from the Script Include
+    ga.getXMLAnswer(function(response) {
+        // Parse the response
+        var data = JSON.parse(response);
+        
+        // Render the D3.js chart with the fetched data
+        renderChart(data);
+    });
+
+    function renderChart(data) {
+        // Set up chart dimensions and margins
+        var margin = { top: 20, right: 30, bottom: 50, left: 60 },
+            width = 600 - margin.left - margin.right,
+            height = 400 - margin.top - margin.bottom;
+
+        // Append SVG element for the chart
+        var svg = d3.select("#chart-container")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        // Set up scales and axes
+        var x = d3.scaleBand()
+            .domain(data.map(d => d.date))
+            .range([0, width])
+            .padding(0.1);
+
+        var y = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d.messages)])
+            .nice()
+            .range([height, 0]);
+
+        // Draw the bars
+        svg.selectAll(".bar")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("x", d => x(d.date))
+            .attr("y", d => y(d.messages))
+            .attr("width", x.bandwidth())
+            .attr("height", d => height - y(d.messages))
+            .attr("fill", "#69b3a2");
+
+        // Add x-axis
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x));
+
+        // Add y-axis
+        svg.append("g")
+            .call(d3.axisLeft(y));
+    }
+</script>
+
+
+
+
+
+
+________________________________________________________________________________________________
+
+
+
 <html>
 <head>
     <script src="https://d3js.org/d3.v6.min.js"></script>

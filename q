@@ -1,6 +1,25 @@
-$files = git diff --name-only develop..release-2.31
+# Define the output CSV file
+$outputFile = "file_modifications.csv"
+
+# Create the CSV headers
+"File,Branch,Last Modified By,Last Edit Date,Commit Hash,Commit Message" | Out-File -FilePath $outputFile
+
+# Get the list of files that differ between develop and release_2_31_0
+$files = git diff --name-only develop..release_2_31_0
 foreach ($file in $files) {
-    "File: $file" | Out-File -Append -FilePath file_modifications.txt
-    git log -1 --pretty=format:"Last modified by: %an on %ad | Commit: %h - %s" release-2.31 -- $file | Out-File -Append -FilePath file_modifications.txt
-    "" | Out-File -Append -FilePath file_modifications.txt
+    # Get the latest commit details for the file in the 'develop' branch
+    $developLog = git log -1 --pretty=format:"%an,%ad,%h,%s" develop -- "$file"
+    
+    # Get the latest commit details for the file in the 'release_2_31_0' branch
+    $releaseLog = git log -1 --pretty=format:"%an,%ad,%h,%s" release_2_31_0 -- "$file"
+    
+    # Prepare the CSV rows for each branch
+    $developOutput = "$file,develop,$developLog"
+    $releaseOutput = "$file,release_2_31_0,$releaseLog"
+    
+    # Append the output to the CSV file
+    $developOutput | Out-File -Append -FilePath $outputFile
+    $releaseOutput | Out-File -Append -FilePath $outputFile
 }
+
+Write-Output "Comparison saved to $outputFile"

@@ -1,31 +1,54 @@
-# Define the output CSV file
-$outputFile = "file_modifications.csv"
+// Email Inbound Action Script in ServiceNow with Enhanced Error Handling and Date Calculation
 
-# Create the CSV headers
-"File,Branch,Last Modified By,Last Edit Date,Commit Hash,Commit Message" | Out-File -FilePath $outputFile
+// Define the target table and fields
+var targetTable = 'u_custom_table'; // Replace with your table's actual name
+var targetField = 'u_total_text_messages'; // Replace with your target field name
+var dateField = 'u_start_date'; // Replace with the field name for the start date
 
-# Get the list of files that differ between develop and release_2_31_0
-$files = git diff --name-only develop..release_2_31_0
-foreach ($file in $files) {
-    # Check if the file content is different between the two branches
-    git diff --quiet develop release_2_31_0 -- "$file"
-    $contentDifferent = !$? # Capture the status; $? is False if the contents are different
+try {
+    // Extract the email body from the inbound email
+    var emailBody = email.body_text;
 
-    if ($contentDifferent) {
-        # Get the latest commit details for the file in the 'develop' branch
-        $developLog = git log -1 --pretty=format:"%an,%ad,%h,%s" develop -- "$file"
-        
-        # Get the latest commit details for the file in the 'release_2_31_0' branch
-        $releaseLog = git log -1 --pretty=format:"%an,%ad,%h,%s" release_2_31_0 -- "$file"
-        
-        # Prepare the CSV rows for each branch
-        $developOutput = "$file,develop,$developLog"
-        $releaseOutput = "$file,release_2_31_0,$releaseLog"
-        
-        # Append the output to the CSV file
-        $developOutput | Out-File -Append -FilePath $outputFile
-        $releaseOutput | Out-File -Append -FilePath $outputFile
+    // Regular expression to find the number after 'total number of text messages:'
+    var regex = /total number of text messages:\s*(\d+)\s*\./i;
+    var matches = emailBody.match(regex);
+
+    // Validate and parse the text message count
+    if (!matches || !matches[1]) {
+        throw new Error('Failed to find "total number of text messages:" with a valid number in the email body.');
     }
-}
+    var textMessageCount = parseInt(matches[1], 10);
+    if (isNaN(textMessageCount)) {
+        throw new Error('Extracted text message count is not a valid number.');
+    }
+    gs.info('Total number of text messages: ' + textMessageCount);
 
-Write-Output "Comparison saved to $outputFile"
+    // Calculate the start date for the previous Wednesday
+    var startDate = new GlideDateTime();
+    startDate.addDaysLocalTime(-((startDate.getDayOfWeekLocalTime() + 2) % 7 + 2)); // Adjust days based on current day
+    startDate.setDisplayValue(startDate.getLocalDate() + ' 00:00:00'); // Set to 00:00:00 on Wednesday
+    gs.info('Calculated start date (previous Wednesday): ' + startDate.getDisplayValue());
+
+    // Query and update the record in the target table
+    var record = new GlideRecord(targetTable);
+    record.addQuery('some_field', email.subject); // Modify this query to match your requirements
+    record.query();
+
+    if (record.next()) {
+        // Update existing record
+        record.setValue(targetField, textMessageCount);
+        record.setValue(dateField, startDate);
+        record.update();
+        gs.info('Record updated successfully with text message count and start date.');
+    } else {
+        // Optionally create a new record if none is found
+        record.initialize();
+        record.setValue(targetField, textMessageCount);
+        record.setValue(dateField, startDate);
+        record.insert();
+        gs.info('New record created successfully with text message count and start date.');
+    }
+} catch (error) {
+    // Handle errors and log them
+    gs.error('Error in Email Inbound Action: ' + error.message);
+}

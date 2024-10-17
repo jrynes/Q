@@ -18,10 +18,10 @@ foreach ($file in $modifiedFiles) {
     # Output the current file being processed for debugging
     Write-Host "Processing file: $file"
 
-    # Get all commit details for this file before the specified cutoff date
-    $commits = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff"
+    # Get all commit details for this file
+    $commits = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file
 
-    # Initialize variables to track the last valid commit
+    # Initialize variable to track the last valid commit
     $lastCommit = ""
     $latestCommitDate = [datetime]::MinValue
 
@@ -33,10 +33,13 @@ foreach ($file in $modifiedFiles) {
         # Get the commit date from the commit details (index 4 is commit date)
         $commitDate = [datetime]::Parse($commitDetails[4]) # Commit date
 
-        # Check if this commit is more recent than our last valid commit
-        if ($commitDate -gt $latestCommitDate) {
-            $latestCommitDate = $commitDate
-            $lastCommit = $commit
+        # Check if this commit is before the cutoff date
+        if ($commitDate -lt [datetime]::Parse($dateCutoff)) {
+            # If this commit is more recent than the last valid commit, update it
+            if ($commitDate -gt $latestCommitDate) {
+                latestCommitDate = $commitDate
+                $lastCommit = $commit
+            }
         }
     }
 

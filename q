@@ -15,8 +15,21 @@ $modifiedFiles = git diff --name-only $mergeCommitHash^ $mergeCommitHash
 $output = @()
 
 foreach ($file in $modifiedFiles) {
-    # Get the last commit details for this file on or before the specified date
-    $lastCommit = git log --pretty=format:"%H|%an|%s|%ci" -- $file --before="$dateCutoff" | Select-Object -First 1
+    # Output the current file being processed for debugging
+    Write-Host "Processing file: $file"
+
+    # Get all commit details for this file before the specified cutoff
+    $commitDetails = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff"
+
+    # Filter commits to find the last one with an author date before the cutoff
+    $lastCommit = $commitDetails | Where-Object { 
+        $parts = $_ -split "\|"
+        $authorDate = [datetime]::Parse($parts[3]) # Parse author date
+        $authorDate -lt [datetime]::Parse($dateCutoff)
+    } | Select-Object -Last 1
+
+    # Output the last commit for debugging
+    Write-Host "Last commit for $file: $lastCommit"
 
     if ($lastCommit) {
         # Split the last commit details using a different delimiter

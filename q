@@ -31,22 +31,24 @@ foreach ($file in $modifiedFiles) {
             break
         }
 
-        # Check the last commit's date
+        # Split the last commit details using a different delimiter
         $commitDetails = $lastCommit -split "\|"
-        $commitDate = [datetime]::Parse($commitDetails[3]) # Get the author date from the commit details
+
+        # Get the commit date from the commit details
+        $commitDate = [datetime]::Parse($commitDetails[4]) # Commit date is at index 4
 
         # If the commit date is after the cutoff, continue to the next commit
         if ($commitDate -gt [datetime]::Parse($dateCutoff)) {
             Write-Host "Last commit is after cutoff date. Searching previous commits..."
             # Move to the next commit
-            $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before=$commitDetails[3] | Select-Object -Last 1
+            $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before=$commitDetails[4] | Select-Object -Last 1
         }
 
-    } while ($commitDate -gt [datetime]::Parse($dateCutoff)
+    } while ($commitDate -gt [datetime]::Parse($dateCutoff)) # Check using commit date
 
     # Prepare output
     if ($lastCommit) {
-        # Split the last commit details using a different delimiter
+        # Split the last commit details again if needed
         $commitDetails = $lastCommit -split "\|"
 
         # Enclose each field in double quotes
@@ -55,7 +57,7 @@ foreach ($file in $modifiedFiles) {
             LastCommitHash    = '"' + $commitDetails[0] + '"'
             LastCommitAuthor  = '"' + $commitDetails[1] + '"'
             LastCommitMessage = '"' + $commitDetails[2] + '"'
-            LastCommitDate    = '"' + $commitDetails[3] + '"'
+            LastCommitDate    = '"' + $commitDetails[4] + '"' # Change to commit date
         }
     } else {
         $output += [PSCustomObject]@{

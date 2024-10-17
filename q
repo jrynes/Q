@@ -18,19 +18,33 @@ foreach ($file in $modifiedFiles) {
     # Output the current file being processed for debugging
     Write-Host "Processing file: $file"
 
-    # Get all commit details for this file before the specified cutoff
-    $commitDetails = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff"
+    # Initialize the last commit variable
+    $lastCommit = ""
 
-    # Filter commits to find the last one with an author date before the cutoff
-    $lastCommit = $commitDetails | Where-Object { 
-        $parts = $_ -split "\|"
-        $authorDate = [datetime]::Parse($parts[3]) # Parse author date
-        $authorDate -lt [datetime]::Parse($dateCutoff)
-    } | Select-Object -Last 1
+    # Loop to find the last commit before the cutoff date
+    do {
+        # Get the last commit details for this file before the specified cutoff date
+        $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff" | Select-Object -Last 1
 
-    # Output the last commit for debugging
-    Write-Host "Last commit for $file: $lastCommit"
+        if (-not $lastCommit) {
+            Write-Host "No commits found before cutoff date for $file."
+            break
+        }
 
+        # Check the last commit's date
+        $commitDetails = $lastCommit -split "\|"
+        $commitDate = [datetime]::Parse($commitDetails[3]) # Get the author date from the commit details
+
+        # If the commit date is after the cutoff, continue to the next commit
+        if ($commitDate -gt [datetime]::Parse($dateCutoff)) {
+            Write-Host "Last commit is after cutoff date. Searching previous commits..."
+            # Move to the next commit
+            $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before=$commitDetails[3] | Select-Object -Last 1
+        }
+
+    } while ($commitDate -gt [datetime]::Parse($dateCutoff)
+
+    # Prepare output
     if ($lastCommit) {
         # Split the last commit details using a different delimiter
         $commitDetails = $lastCommit -split "\|"

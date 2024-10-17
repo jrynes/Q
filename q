@@ -18,33 +18,27 @@ foreach ($file in $modifiedFiles) {
     # Output the current file being processed for debugging
     Write-Host "Processing file: $file"
 
-    # Initialize the last commit variable
+    # Get all commit details for this file before the specified cutoff date
+    $commits = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff"
+
+    # Initialize variables to track the last valid commit
     $lastCommit = ""
+    $latestCommitDate = [datetime]::MinValue
 
-    # Loop to find the last commit before the cutoff date
-    do {
-        # Get the last commit details for this file before the specified cutoff date
-        $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before="$dateCutoff" | Select-Object -Last 1
+    # Process each commit line
+    foreach ($commit in $commits) {
+        # Split commit details using a different delimiter
+        $commitDetails = $commit -split "\|"
 
-        if (-not $lastCommit) {
-            Write-Host "No commits found before cutoff date for $file."
-            break
+        # Get the commit date from the commit details (index 4 is commit date)
+        $commitDate = [datetime]::Parse($commitDetails[4]) # Commit date
+
+        # Check if this commit is more recent than our last valid commit
+        if ($commitDate -gt $latestCommitDate) {
+            $latestCommitDate = $commitDate
+            $lastCommit = $commit
         }
-
-        # Split the last commit details using a different delimiter
-        $commitDetails = $lastCommit -split "\|"
-
-        # Get the commit date from the commit details
-        $commitDate = [datetime]::Parse($commitDetails[4]) # Commit date is at index 4
-
-        # If the commit date is after the cutoff, continue to the next commit
-        if ($commitDate -gt [datetime]::Parse($dateCutoff)) {
-            Write-Host "Last commit is after cutoff date. Searching previous commits..."
-            # Move to the next commit
-            $lastCommit = git log --pretty=format:"%H|%an|%s|%ad|%cd" --date=iso -- $file --before=$commitDetails[4] | Select-Object -Last 1
-        }
-
-    } while ($commitDate -gt [datetime]::Parse($dateCutoff)) # Check using commit date
+    }
 
     # Prepare output
     if ($lastCommit) {
@@ -57,7 +51,7 @@ foreach ($file in $modifiedFiles) {
             LastCommitHash    = '"' + $commitDetails[0] + '"'
             LastCommitAuthor  = '"' + $commitDetails[1] + '"'
             LastCommitMessage = '"' + $commitDetails[2] + '"'
-            LastCommitDate    = '"' + $commitDetails[4] + '"' # Change to commit date
+            LastCommitDate    = '"' + $commitDetails[4] + '"' # Commit date
         }
     } else {
         $output += [PSCustomObject]@{

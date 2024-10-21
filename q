@@ -15,29 +15,37 @@ export class HomeService {
       // Determine if any role has access to all links
       const hasAllAccess = roles.some(role => section.roles[role]?.includes('*'));
 
-      // Filter and gather links from sub-sections
-      const subSections = section.subSections.map(subSection => {
-        const filteredLinks = hasAllAccess
-          ? subSection.links // Give access to all links if wildcard present
-          : subSection.links.filter(link =>
-              roles.some(role => section.roles[role]?.includes(link.name))
-            );
+      // Filter out sections where the roles array is empty
+      if (Object.keys(section.roles).length === 0) {
+        return null; // Exclude section if it has no roles
+      }
 
-        // Add the filtered links to the combined set
-        filteredLinks.forEach(link => combinedLinks.add(link.name)); // Avoid duplicates
+      // Iterate through roles to gather links
+      roles.forEach(role => {
+        // Filter sub-section links based on current role
+        const subSections = section.subSections.map(subSection => {
+          const filteredLinks = hasAllAccess
+            ? subSection.links // Give access to all links if wildcard present
+            : subSection.links.filter(link =>
+                section.roles[role]?.includes(link.name)
+              );
 
-        return {
-          ...subSection,
-          links: filteredLinks // Set filtered links for sub-sections
-        };
-      }).filter(subSection => subSection.links.length > 0); // Remove empty sub-sections
+          // Add the filtered links to the combined set
+          filteredLinks.forEach(link => combinedLinks.add(link.name)); // Avoid duplicates
 
-      // Add section links based on current roles
-      const sectionLinks = section.links || [];
-      sectionLinks.forEach(link => {
-        if (roles.some(role => section.roles[role]?.includes(link.name))) {
-          combinedLinks.add(link.name); // Add to set to avoid duplicates
-        }
+          return {
+            ...subSection,
+            links: filteredLinks // Set filtered links for sub-sections
+          };
+        }).filter(subSection => subSection.links.length > 0); // Remove empty sub-sections
+
+        // Add section links based on current role
+        const sectionLinks = section.links || [];
+        sectionLinks.forEach(link => {
+          if (section.roles[role]?.includes(link.name)) {
+            combinedLinks.add(link.name); // Add to set to avoid duplicates
+          }
+        });
       });
 
       // Convert Set back to array
@@ -46,15 +54,14 @@ export class HomeService {
         section.subSections.flatMap(sub => sub.links).find(link => link.name === name)
       );
 
-      // Check if there are any links available before returning the section
-      if (finalLinks.length > 0 || subSections.length > 0) {
-        return {
-          ...section,
-          subSections: subSections, // Keep the filtered sub-sections
-          links: finalLinks // Set combined links to the section
-        };
-      }
-      return null; // Return null if no links or sub-sections are available
+      // Return section only if it has valid links or sub-sections
+      return (finalLinks.length > 0 || section.subSections.some(sub => sub.links.length > 0))
+        ? {
+            ...section,
+            subSections: section.subSections.filter(sub => sub.links.length > 0), // Keep filtered sub-sections
+            links: finalLinks // Set combined links to the section
+          }
+        : null; // Return null if no links or valid sub-sections
     }).filter(section => section !== null); // Filter out null sections
   }
 }

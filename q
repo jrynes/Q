@@ -1,67 +1,24 @@
-import { Injectable } from '@angular/core';
-import homeData from '../assets/home-sections.json'; // Adjust the path to where your JSON is located
+<!-- panel.component.html -->
+<div class="card mb-4">
+  <img [src]="image" class="card-img-top" alt="{{ title }}" *ngIf="image">
+  <div class="card-body">
+    <div class="title-background">
+      <h5 class="card-title">{{ title }}</h5>
+    </div>
 
-@Injectable({
-  providedIn: 'root'
-})
-export class HomeService {
-  private homeSections = homeData.homeSections;
-
-  getSectionsForRoles(roles: string[]) {
-    return this.homeSections.map(section => {
-      // Initialize combined links and sub-sections
-      let combinedLinks = new Set<string>(); // Use Set to avoid duplicates
-
-      // Determine if any role has access to all links
-      const hasAllAccess = roles.some(role => section.roles[role]?.includes('*'));
-
-      // Filter out sections where the roles array is empty
-      if (Object.keys(section.roles).length === 0) {
-        return null; // Exclude section if it has no roles
-      }
-
-      // Iterate through roles to gather links
-      roles.forEach(role => {
-        // Filter sub-section links based on current role
-        const subSections = section.subSections.map(subSection => {
-          const filteredLinks = hasAllAccess
-            ? subSection.links // Give access to all links if wildcard present
-            : subSection.links.filter(link =>
-                section.roles[role]?.includes(link.name)
-              );
-
-          // Add the filtered links to the combined set
-          filteredLinks.forEach(link => combinedLinks.add(link.name)); // Avoid duplicates
-
-          return {
-            ...subSection,
-            links: filteredLinks // Set filtered links for sub-sections
-          };
-        }).filter(subSection => subSection.links.length > 0); // Remove empty sub-sections
-
-        // Add section links based on current role
-        const sectionLinks = section.links || [];
-        sectionLinks.forEach(link => {
-          if (section.roles[role]?.includes(link.name)) {
-            combinedLinks.add(link.name); // Add to set to avoid duplicates
-          }
-        });
-      });
-
-      // Convert Set back to array
-      const finalLinks = Array.from(combinedLinks).map(name =>
-        section.links.find(link => link.name === name) || 
-        section.subSections.flatMap(sub => sub.links).find(link => link.name === name)
-      );
-
-      // Return section only if it has valid links or sub-sections
-      return (finalLinks.length > 0 || section.subSections.some(sub => sub.links.length > 0))
-        ? {
-            ...section,
-            subSections: section.subSections.filter(sub => sub.links.length > 0), // Keep filtered sub-sections
-            links: finalLinks // Set combined links to the section
-          }
-        : null; // Return null if no links or valid sub-sections
-    }).filter(section => section !== null); // Filter out null sections
-  }
-}
+    <!-- Iterate through sections -->
+    <div *ngFor="let section of sections">
+      <h6 class="section-header">{{ section.sectionTitle }}</h6>
+      
+      <!-- Iterate through articles within the section -->
+      <div *ngFor="let article of section.articles">
+        <h6 class="article-header">{{ article.articleTitle }}</h6>
+        <ul class="list-group mb-3">
+          <li class="list-group-item" *ngFor="let link of article.links">
+            <a [routerLink]="link.url" class="link">{{ link.name }}</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

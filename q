@@ -1,24 +1,24 @@
 <!-- panel.component.html -->
-<div class="card mb-4">
-  <img [src]="image" class="card-img-top" alt="{{ title }}" *ngIf="image">
+<div class="card w-100">
+  <img [src]="image" class="card-img-top d-none d-sm-block" alt="{{ title }}">
+  <div class="bg-light p-2">
+    <h3 class="m-0 text-uppercase text-shadow text-primary">{{ title }}</h3>
+  </div>
   <div class="card-body">
-    <div class="title-background">
-      <h5 class="card-title">{{ title }}</h5>
+    <div *ngFor="let subSection of subSections">
+      <h4 class="card-title">{{ subSection.subHeading }}</h4>
+      <ul class="list-unstyled">
+        <li *ngFor="let link of subSection.links">
+          <a [routerLink]="link.url">{{ link.name }}</a>
+        </li>
+      </ul>
     </div>
 
-    <!-- Iterate through sections -->
-    <div *ngFor="let section of sections">
-      <h6 class="section-header">{{ section.sectionTitle }}</h6>
-      
-      <!-- Iterate through articles within the section -->
-      <div *ngFor="let article of section.articles">
-        <h6 class="article-header">{{ article.articleTitle }}</h6>
-        <ul class="list-group mb-3">
-          <li class="list-group-item" *ngFor="let link of article.links">
-            <a [routerLink]="link.url" class="link">{{ link.name }}</a>
-          </li>
-        </ul>
-      </div>
-    </div>
+    <h4 class="card-title" *ngIf="links.length > 0">Other Links</h4>
+    <ul class="list-unstyled" *ngIf="links.length > 0">
+      <li *ngFor="let link of links">
+        <a [routerLink]="link.url">{{ link.name }}</a>
+      </li>
+    </ul>
   </div>
 </div>

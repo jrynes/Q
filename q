@@ -1,74 +1,128 @@
-getSectionsForRoles(roles: string[]) {
-  return this.homeSections.map(section => {
-    console.log("Processing section:", section.sectionTitle);
-    
-    let combinedLinks = new Set<string>(); // Use Set to avoid duplicates
-    const hasAllAccess = roles.some(role => section.roles[role?.toLowerCase()]?.includes('*'));
-
-    console.log("Has all access:", hasAllAccess);
-
-    // Skip section if there are no roles
-    if (Object.keys(section.roles).length === 0) {
-      console.log("No roles for section:", section.sectionTitle);
-      return null; // Exclude section if it has no roles
+  // Main method to check if a route can be activated
+  async canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): Promise<boolean> {
+    // First, check if OktaAuth instance is not null
+    if (!this.oktaAuth) {
+      console.error("OktaAuth instance is null");
+      this.handleLoginRedirect(state.url);
+      return false; // Deny access if OktaAuth is not available
     }
 
-    // Gather links from the section's links
-    const sectionLinks = section.links || []; // Ensure sectionLinks is an array
-    console.log("Initial section links:", sectionLinks);
+    // Check if the user is logged in
+    const isAuthenticated = await this.oktaAuth.isAuthenticated();
+    if (!isAuthenticated) {
+      console.log('User is not authenticated, redirecting to login.');
+      this.handleLoginRedirect(state.url);
+      return false; // Deny access if not authenticated
+    }
 
-    // Add direct section links based on the current role
-    sectionLinks.forEach(link => {
-      if (hasAllAccess || roles.some(role => section.roles[role?.toLowerCase()]?.includes(link.name))) {
-        console.log("Adding direct link:", link.name);
-        combinedLinks.add(link.name); // Add to set to avoid duplicates
-      } else {
-        console.log("Skipping link due to role restrictions:", link.name);
-      }
-    });
+    // Initialize user information
+    this.user.init();
+    await this.authService.checkAuthentication();
 
-    // Iterate through roles to gather sub-section links
-    roles.forEach(role => {
-      section.subSections.forEach(subSection => {
-        console.log("Processing sub-section:", subSection.subHeading);
-        
-        const filteredLinks = hasAllAccess
-          ? subSection.links // Give access to all links if wildcard present
-          : subSection.links.filter(link =>
-              section.roles[role?.toLowerCase()]?.includes(link.name)
-            );
+    // Get user roles from the user service
+    const userRoles = this.user.getRoles(); // Assume this method fetches user roles
+    console.log('User roles:', userRoles);
 
-        console.log("Filtered links for role", role, "in sub-section:", filteredLinks);
+    // Get the required scopes for the current route
+    const requiredScopes = this.getScopesForRoute(state.url);
+    console.log('Required scopes:', requiredScopes);
 
-        // Add filtered links to the combined set
-        filteredLinks.forEach(link => {
-          console.log("Adding sub-section link:", link.name);
-          combinedLinks.add(link.name); // Add to set to avoid duplicates
-        });
+    // Handle the case when requiredScopes is empty
+    if (requiredScopes.length === 0) {
+      console.log('No required scopes for this route, access denied.');
+      this.router.navigate(['/access-denied']); // Redirect to access denied page
+      return false; // Deny access
+    }
+
+    // Retrieve the current token from local storage
+    try {
+      this.currentToken = JSON.parse(localStorage.getItem('okta-token-storage') || '{}');
+    } catch (error) {
+      console.error('Token retrieval failed:', error);
+      this.currentToken = {};
+    }
+
+    // If there is a current token, update session storage with its scopes
+    if (this.currentToken) {
+      sessionStorage.setItem('originalOktaToken', JSON.stringify(this.currentToken));
+      sessionStorage.setItem("oktaToken", this.currentToken.accessToken.accessToken);
+
+      const existingScopes = sessionStorage.getItem('oktaScopes')?.split(',') || [];
+      const newScopes = this.currentToken.accessToken.scopes.filter((scope: string) => !existingScopes.includes(scope));
+      const updatedScopes = [...existingScopes, ...newScopes];
+      sessionStorage.setItem('oktaScopes', updatedScopes.join(','));
+    }
+
+    // Check if the user has the required scopes
+    if (await this.accessTokenCheckService.hasRequiredScopes(requiredScopes)) {
+      console.log('User has required scopes, access granted.');
+      return true; // Allow access if the user has the required scopes
+    }
+
+    // Try to get a new token from Okta without prompting the user
+    try {
+      console.log("Requesting new scopes from Okta...");
+      const res = await this.oktaAuth.token.getWithoutPrompt({
+        responseType: ['id_token', 'token'],
+        scopes: requiredScopes,
       });
-    });
 
-    // Convert Set back to array
-    const finalLinks = Array.from(combinedLinks).map(name => {
-      const linkFromSection = section.links?.find(link => link.name === name);
-      const linkFromSubSections = section.subSections?.flatMap(sub => sub.links).find(link => link.name === name);
-      
-      console.log("Checking for link:", name);
-      console.log("Found link in section:", linkFromSection);
-      console.log("Found link in sub-sections:", linkFromSubSections);
-      
-      return linkFromSection || linkFromSubSections || null; // Return the found link or null
-    }).filter(link => link !== null); // Filter out null values
+      // If successful, update session storage with the new token's scopes
+      if (res.tokens?.accessToken?.scopes) {
+        const newScopes = res.tokens.accessToken.scopes;
+        const existingScopes = sessionStorage.getItem('oktaScopes')?.split(',') || [];
+        const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
+        sessionStorage.setItem('oktaScopes', updatedScopes.join(','));
 
-    console.log("Final links for section:", finalLinks);
-
-    // Return section only if it has valid links or sub-sections
-    return (finalLinks.length > 0 || section.subSections.some(sub => sub.links.length > 0))
-      ? {
-          ...section,
-          subSections: section.subSections.filter(sub => sub.links.length > 0), // Keep filtered sub-sections
-          links: finalLinks // Set combined links to the section
+        // Check again if the user has the required scopes
+        if (await this.accessTokenCheckService.hasRequiredScopes(requiredScopes)) {
+          console.log('User has new required scopes after token refresh, access granted.');
+          return true; // Allow access if scopes are valid now
         }
-      : null; // Return null if no links or valid sub-sections
-  }).filter(section => section !== null); // Filter out null sections
+      }
+    } catch (error) {
+      // If token retrieval or validation fails, log the error and redirect to login
+      console.error('Token retrieval or validation failed:', error);
+      await this.oktaAuth.signInWithRedirect({ scopes: requiredScopes });
+    }
+
+    // Deny access if all checks fail
+    console.log('Access denied for route:', state.url);
+    return false;
+  }
+
+  private async handleLoginRedirect(originalUri: string) {
+    try {
+      const isAuthenticated = await this.oktaAuth.isAuthenticated();
+      if (isAuthenticated) {
+        this.oktaAuth.setOriginalUri(originalUri);
+        sessionStorage.setItem("url", originalUri);
+        await this.oktaAuth.signInWithRedirect();
+      } else {
+        this.router.navigate(['/']);
+      }
+    } catch (err) {
+      console.error('Login redirect failed:', err);
+    }
+  }
+
+  private getScopesForRoute(url: string): string[] {
+    const section = this.homeService.homeSections.find(section =>
+      section.links.some(link => link.url === url) || 
+      section.subSections.some(sub => sub.links.some(link => link.url === url))
+    );
+
+    if (section) {
+      const requiredScopes = Object.keys(section.scopes).reduce((acc, role) => {
+        if (section.roles[role]?.includes('*') || section.roles[role]?.some(roleName => this.user.getRoles().includes(roleName))) {
+          return [...acc, ...section.scopes[role]];
+        }
+        return acc;
+      }, []);
+      console.log('Required scopes for route:', requiredScopes);
+      return requiredScopes;
+    }
+
+    return [];
+  }
 }
